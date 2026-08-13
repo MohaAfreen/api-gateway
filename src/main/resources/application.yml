@@ -19,12 +19,46 @@ spring:
               uri: http://task-service:8080
               predicates:
                 - Path=/tasks/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: taskServiceCircuitBreaker
+                    fallbackUri: forward:/fallback/task
+                    statusCodes:
+                      - 503
+                - name: Retry
+                  args:
+                    retries: 2
+                    methods: GET
+                    statuses:
+                     - BAD_GATEWAY
+                     - SERVICE_UNAVAILABLE
+                     - GATEWAY_TIMEOUT
+                    exceptions:
+                      - java.io.IOException
+                      - java.util.concurrent.TimeoutException
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      taskServiceCircuitBreaker:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    instances:
+      taskServiceCircuitBreaker:
+        timeout-duration: 5s
 jwt:
   secret: UniversalFavoriteAndSuperHandsomeSongjoongkiSecretKey12345
 logging:
   level:
     org.springframework.security: DEBUG
     org.springframework.security.oauth2: DEBUG
+    io.github.resilience4j: DEBUG
 management:
   endpoints:
     web:
